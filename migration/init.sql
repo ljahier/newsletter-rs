@@ -65,7 +65,6 @@ create table if not exists sendings (
   updated_at timestamp with time zone default current_timestamp,
   foreign key (theme_id) references themes (id),
   foreign key (sent_by) references users (id)
-  set null
 );
 create table if not exists sending_contact_lists (
   sending_id text,

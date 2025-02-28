@@ -5,24 +5,8 @@ use axum::{
     response::Response,
 };
 use jsonwebtoken::{DecodingKey, Validation, decode};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Claims {
-    pub sub: String,
-    pub exp: usize,
-}
-
-#[derive(Clone)]
-pub struct Session {
-    pub user_email: String,
-}
-
-impl Session {
-    pub fn new(user_email: String) -> Self {
-        Self { user_email }
-    }
-}
+use crate::models::types::{Claims, Session};
 
 pub async fn auth_middleware(
     mut req: Request,
@@ -45,7 +29,7 @@ pub async fn auth_middleware(
 
     let token = match token {
         Some(t) => t,
-        None => return Err((StatusCode::UNAUTHORIZED, "Invalid auth token".to_string())),
+        None => return Err((StatusCode::UNAUTHORIZED, "Invalid auth 2 token".to_string())),
     };
 
     let secret = "secret";
@@ -54,10 +38,17 @@ pub async fn auth_middleware(
         &DecodingKey::from_secret(secret.as_ref()),
         &Validation::default(),
     )
-    .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid auth token".to_string()))?;
+    .map_err(|err| {
+        (
+            StatusCode::UNAUTHORIZED,
+            format!("Invalid auth 3 token, {err}").to_string(),
+        )
+    })?;
 
-    req.extensions_mut()
-        .insert(Session::new(token_data.claims.sub));
+    req.extensions_mut().insert(Session::new(
+        token_data.claims.sub.user_email,
+        token_data.claims.sub.user_id,
+    ));
 
     Ok(next.run(req).await)
 }

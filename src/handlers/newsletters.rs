@@ -1,33 +1,34 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::AppState;
 use crate::helpers::response::{response_err, response_success};
 use crate::models::newsletters::{NewsletterRaw, NewsletterRequest, NewsletterWithLists};
-use axum::Json;
+use crate::models::types::Session;
+use axum::{Extension, Json};
 use axum::{extract::State, http::StatusCode, response::Response};
 use chrono::{NaiveDateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 pub async fn get_newsletters(State(state): State<AppState>) -> Response {
     let query = r#"
-        select 
-            s.id,
+        select s.id,
             s.name,
             s.send_date,
             s.status,
             s.content_html,
             s.content_plain,
             s.sent_at,
-            s.sent_by,
+            u.email as sent_by,
             s.created_at,
             s.updated_at,
             group_concat(cl.name, ',') as contact_lists
         from sendings s
+        inner join users u on u.id = s.sent_by
         left join sending_contact_lists scl on scl.sending_id = s.id
         left join contact_lists cl on cl.id = scl.contact_list_id
         where s.type = 'newsletter'
         group by s.id
-        order by s.created_at desc
+        order by s.created_at desc;
     "#;
 
     let raw_newsletters = match sqlx::query_as::<_, NewsletterRaw>(query)
@@ -72,6 +73,7 @@ pub async fn get_newsletters(State(state): State<AppState>) -> Response {
 
 pub async fn create_newsletter(
     State(state): State<AppState>,
+    Extension(session): Extension<Session>,
     Json(payload): Json<NewsletterRequest>,
 ) -> Response {
     let (status, send_date, sent_at) = if payload.action == "send" {
@@ -112,12 +114,13 @@ pub async fn create_newsletter(
     let id = Uuid::new_v4().to_string();
 
     let result = sqlx::query(
-        "insert into sendings (id, type, name, send_date, status, content_html, content_plain, sent_at, sent_by)
-         values (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?)"
+        "insert into sendings (id, type, name, send_date, sent_by, status, content_html, content_plain, sent_at, sent_by)
+         values (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&id)
     .bind(&payload.name)
     .bind(send_date)
+    .bind(session.user_id)
     .bind(status)
     .bind(content_html)
     .bind(content_plain)

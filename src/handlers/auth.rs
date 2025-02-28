@@ -12,7 +12,11 @@ use validator::{Validate, ValidationErrors};
 
 use bcrypt::verify;
 
-use crate::{AppState, helpers::response::ApiResponse};
+use crate::{
+    AppState,
+    helpers::response::ApiResponse,
+    models::types::{Claims, Session},
+};
 
 #[derive(Deserialize, Validate)]
 pub struct LoginRequest {
@@ -27,14 +31,9 @@ pub struct TokenResponse {
     pub token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    exp: usize,
-}
-
 #[derive(FromRow, Debug)]
-struct UserPassword {
+struct User {
+    id: String,
     password: String,
 }
 
@@ -52,8 +51,8 @@ pub async fn login(
             jar,
         );
     }
-    let user: Option<UserPassword> =
-        match sqlx::query_as::<_, UserPassword>("SELECT password FROM users WHERE email = ?")
+    let user: Option<User> =
+        match sqlx::query_as::<_, User>("SELECT id, password FROM users WHERE email = ?")
             .bind(&payload.email.clone())
             .fetch_optional(&state.db_pool)
             .await
@@ -93,7 +92,10 @@ pub async fn login(
         .expect("Failed to compute expiration")
         .timestamp() as usize;
     let claims = Claims {
-        sub: payload.email,
+        sub: Session {
+            user_email: payload.email,
+            user_id: user.id,
+        },
         exp,
     };
 

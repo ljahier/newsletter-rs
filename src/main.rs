@@ -1,6 +1,7 @@
 mod config;
 mod handlers;
 mod helpers;
+mod models;
 mod routes;
 
 use bcrypt::{DEFAULT_COST, hash};
@@ -110,7 +111,7 @@ async fn main() {
 
     let state = AppState { db_pool: pool };
 
-    let app = routes::create_routes(state);
+    let app = routes::create_routes(&state);
 
     let listener = tokio::net::TcpListener::bind(config.server.host.clone())
         .await

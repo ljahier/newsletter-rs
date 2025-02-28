@@ -58,11 +58,13 @@ create table if not exists sendings (
   status text check (status in ('pending', 'sent', 'failed', 'draft')),
   content_html text,
   content_plain text,
+  theme_id text,
   sent_at timestamp with time zone,
   sent_by text,
   created_at timestamp with time zone default current_timestamp,
   updated_at timestamp with time zone default current_timestamp,
-  foreign key (sent_by) references users (id) on delete
+  foreign key (theme_id) references themes (id),
+  foreign key (sent_by) references users (id)
   set null
 );
 create table if not exists sending_contact_lists (

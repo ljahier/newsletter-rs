@@ -1,11 +1,10 @@
 use serde::Deserialize;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
-    pub assets: AssetsConfig,
     pub database: DatabaseConfig,
     pub email: EmailConfig,
     pub site: SiteConfig,
@@ -18,18 +17,13 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AssetsConfig {
-    pub path: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct DatabaseConfig {
     pub sqlite: SqliteConfig,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SqliteConfig {
-    pub filename: String,
+    pub file_path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,12 +68,6 @@ impl Config {
         }
         if self.server.host.trim().is_empty() {
             return Err("server.host is empty".into());
-        }
-        if self.assets.path.trim().is_empty() {
-            return Err("assets.path is empty".into());
-        }
-        if self.database.sqlite.filename.trim().is_empty() {
-            return Err("database.sqlite.filename is empty".into());
         }
         if self.email.smtp.server_host.trim().is_empty() {
             return Err("email.smtp.server_host is empty".into());

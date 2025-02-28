@@ -1,0 +1,9 @@
+{% extends "base.html" %} {% block title %}Liste des newsletters{% endblock %}
+{% block content %}
+<h1>Liste des newsletters</h1>
+<ul>
+  {% for newsletter in newsletters %}
+  <li>{{ newsletter.title }} - {{ newsletter.content }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %} {% block title %}Créer une newsletter{% endblock %} {%
+block head %}
+<!-- Styles spécifiques à ProseMirror (à adapter ou à fournir en local) -->
+<link rel="stylesheet" href="/static/prosemirror.css" />
+
+<!-- Chargement minimal des modules ProseMirror depuis un CDN (ex. unpkg) -->
+<script src="https://unpkg.com/prosemirror-state/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-view/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-model/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-transform/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-commands/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-history/dist/index.js"></script>
+<script src="https://unpkg.com/prosemirror-schema-basic/dist/index.js"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Fonction d'initialisation de l'éditeur ProseMirror
+    const { EditorState } = window["prosemirror-state"];
+    const { EditorView } = window["prosemirror-view"];
+    const { DOMParser } = window["prosemirror-model"];
+    const { schema } = window["prosemirror-schema-basic"];
+    const { history } = window["prosemirror-history"];
+
+    // Crée un état initial en utilisant le contenu d'un div caché
+    const contentElem = document.getElementById("editor-content");
+    const state = EditorState.create({
+      doc: DOMParser.fromSchema(schema).parse(contentElem),
+      plugins: [history()],
+    });
+
+    // Initialise la vue dans le div #editor
+    window.editorView = new EditorView(document.getElementById("editor"), {
+      state: state,
+    });
+  });
+</script>
+
+<script>
+  // Gestion du choix du type de contenu
+  function toggleContentType() {
+    const type = document.querySelector(
+      'input[name="content_type"]:checked'
+    ).value;
+    if (type === "text") {
+      document.getElementById("editor-container").style.display = "block";
+      document.getElementById("html-editor-container").style.display = "none";
+    } else {
+      document.getElementById("editor-container").style.display = "none";
+      document.getElementById("html-editor-container").style.display = "block";
+    }
+  }
+  document.querySelectorAll('input[name="content_type"]').forEach((radio) => {
+    radio.addEventListener("change", toggleContentType);
+  });
+  toggleContentType();
+
+  // Avant la soumission du formulaire, récupérer le contenu HTML de l'éditeur ProseMirror
+  document.querySelector("form").addEventListener("submit", function (e) {
+    const type = document.querySelector(
+      'input[name="content_type"]:checked'
+    ).value;
+    if (type === "text" && window.editorView) {
+      const content =
+        window.editorView.dom.querySelector(".ProseMirror").innerHTML;
+      document.getElementById("content").value = content;
+    }
+  });
+</script>
+{% endblock %} {% block content %}
+<h1>Créer une Newsletter</h1>
+<form action="/api/newsletters/create" method="post">
+  <div>
+    <label for="name">Nom :</label>
+    <input type="text" id="name" name="name" required />
+  </div>
+  <div>
+    <label for="send_date">Date d'envoi (optionnelle) :</label>
+    <input type="datetime-local" id="send_date" name="send_date" />
+  </div>
+  <div>
+    <label>Type de contenu :</label>
+    <input type="radio" id="content_text" name="content_type" value="text" checked />
+    <label for="content_text">Texte (WYSIWYG)</label>
+    <input type="radio" id="content_html" name="content_type" value="html" />
+    <label for="content_html">HTML</label>
+  </div>
+  <!-- Zone pour le contenu en mode texte avec ProseMirror -->
+  <div id="editor-container">
+    <!-- Contenu de base à parser par ProseMirror (invisible) -->
+    <div id="editor-content" style="display: none">
+      <p>Entrez ici votre texte...</p>
+    </div>
+    <!-- L'éditeur ProseMirror sera rendu ici -->
+    <div id="editor" class="w-full border p-2" style="min-height: 200px"></div>
+  </div>
+  <!-- Zone pour le contenu en mode HTML -->
+  <div id="html-editor-container" style="display: none">
+    <label for="html-editor">Contenu (HTML) :</label>
+    <textarea id="html-editor" name="content"></textarea>
+  </div>
+  <!-- Champ caché pour transmettre le contenu généré par ProseMirror -->
+  <input type="hidden" id="content" name="content" />
+
+  <div>
+    <button type="submit" name="action" value="send">
+      Envoyer la newsletter
+    </button>
+    <button type="submit" name="action" value="save">
+      Sauvegarder en brouillon
+    </button>
+  </div>
+</form>
+{% endblock %} {% endblock %}

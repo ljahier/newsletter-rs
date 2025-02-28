@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Nouvelle Lettre{% endblock %}</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <script defer src="/public/embed.js"></script>
+    {% block head %}{% endblock %}
+  </head>
+  <body data-dynamic-route-target>
+    <div class="flex min-h-screen">
+      <!-- Sidebar à gauche -->
+      <aside class="w-64 p-6 border-r border-black flex flex-col space-y-4">
+        <button
+          class="border border-black rounded-sm px-4 py-2 hover:bg-black hover:text-white"
+        >
+          Newsletters
+        </button>
+        <button
+          class="border border-black rounded-sm px-4 py-2 hover:bg-black hover:text-white"
+        >
+          CRM
+        </button>
+        <button
+          class="border border-black rounded-sm px-4 py-2 hover:bg-black hover:text-white"
+        >
+          Templates
+        </button>
+        <button
+          class="border border-black rounded-sm px-4 py-2 hover:bg-black hover:text-white"
+        >
+          Members
+        </button>
+        <button
+          class="border border-black rounded-sm px-4 py-2 hover:bg-black hover:text-white"
+        >
+          Account
+        </button>
+      </aside>
+      <div id="app" class="p-6 h-full w-full">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </body>
+</html>

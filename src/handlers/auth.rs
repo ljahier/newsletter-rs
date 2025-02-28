@@ -42,11 +42,6 @@ struct User {
 }
 
 /// POST /login
-///
-/// This endpoint accepts a JSON payload containing `email` and `password`.
-/// It validates the payload, retrieves the corresponding user from the SQLite database using SQLx,
-/// and securely verifies the password using bcrypt. If the credentials are valid,
-/// it returns a JWT token valid for 24 hours.
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -60,7 +55,6 @@ pub async fn login(
             jar,
         );
     }
-
     let user: Option<User> = match sqlx::query_as::<_, User>(
         "SELECT id, email, password, role FROM users WHERE email = ?",
     )
@@ -97,16 +91,6 @@ pub async fn login(
             jar,
         );
     }
-
-    // if !verify(&payload.password, &user.password).map_err(|e| {
-    //     eprintln!("Bcrypt verification error: {:?}", e);
-    //     return response_err_with_cookie_jar(
-    //         StatusCode::INTERNAL_SERVER_ERROR,
-    //         "Password verification error".to_string(),
-    //     );
-    // }) {
-    //     return response_err_with_cookie_jar(StatusCode::UNAUTHORIZED, "Invalid credentials".to_string());
-    // }
 
     let exp = Utc::now()
         .checked_add_signed(Duration::hours(24))

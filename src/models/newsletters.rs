@@ -13,7 +13,6 @@ pub struct NewsletterRaw {
     pub sent_by: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    // GROUP_CONCAT renvoie une chaîne (ex: "List1,List2,...") ou NULL si aucune liste n'est associée
     pub contact_lists: Option<String>,
 }
 
@@ -36,10 +35,8 @@ pub struct NewsletterWithLists {
 pub struct NewsletterRequest {
     pub name: String,
     pub send_date: Option<String>,
-
     pub content_type: String,
-
     pub content: String,
-
     pub action: String,
+    pub contact_list_ids: Option<Vec<String>>,
 }

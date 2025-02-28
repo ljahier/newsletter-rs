@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::AppState;
 use crate::helpers::response::{response_err, response_success};
 use crate::models::newsletters::{NewsletterRaw, NewsletterRequest, NewsletterWithLists};
@@ -8,7 +10,7 @@ use uuid::Uuid;
 
 pub async fn get_newsletters(State(state): State<AppState>) -> Response {
     let query = r#"
-        SELECT 
+        select 
             s.id,
             s.name,
             s.send_date,
@@ -19,12 +21,13 @@ pub async fn get_newsletters(State(state): State<AppState>) -> Response {
             s.sent_by,
             s.created_at,
             s.updated_at,
-            GROUP_CONCAT(cl.name, ',') as contact_lists
-        FROM sendings s
-        LEFT JOIN sending_contact_lists scl ON scl.sending_id = s.id
-        LEFT JOIN contact_lists cl ON cl.id = scl.contact_list_id
-        WHERE s.type = 'newsletter'
-        GROUP BY s.id
+            group_concat(cl.name, ',') as contact_lists
+        from sendings s
+        left join sending_contact_lists scl on scl.sending_id = s.id
+        left join contact_lists cl on cl.id = scl.contact_list_id
+        where s.type = 'newsletter'
+        group by s.id
+        order by s.created_at desc
     "#;
 
     let raw_newsletters = match sqlx::query_as::<_, NewsletterRaw>(query)
@@ -109,8 +112,8 @@ pub async fn create_newsletter(
     let id = Uuid::new_v4().to_string();
 
     let result = sqlx::query(
-        "INSERT INTO sendings (id, type, name, send_date, status, content_html, content_plain, sent_at, sent_by)
-         VALUES (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?)"
+        "insert into sendings (id, type, name, send_date, status, content_html, content_plain, sent_at, sent_by)
+         values (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&id)
     .bind(&payload.name)
@@ -123,14 +126,36 @@ pub async fn create_newsletter(
     .execute(&state.db_pool)
     .await;
 
-    match result {
-        Ok(_) => response_success(StatusCode::CREATED, "Newsletter créée".to_string()),
-        Err(e) => {
-            eprintln!("Erreur lors de la création de la newsletter: {:?}", e);
-            response_err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Erreur lors de la création".to_string(),
+    if let Err(e) = result {
+        eprintln!("Erreur lors de la création de la newsletter: {:?}", e);
+        return response_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Erreur lors de la création".to_string(),
+        );
+    }
+
+    if let Some(list_ids) = payload.contact_list_ids {
+        let unique_ids: HashSet<String> = list_ids.into_iter().collect();
+        for list_id in unique_ids {
+            let assoc_result: Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> = sqlx::query(
+                "INSERT INTO sending_contact_lists (sending_id, contact_list_id) VALUES (?, ?)",
             )
+            .bind(&id)
+            .bind(list_id)
+            .execute(&state.db_pool)
+            .await;
+            if let Err(e) = assoc_result {
+                eprintln!(
+                    "Erreur lors de l'association de la newsletter avec une liste: {:?}",
+                    e
+                );
+                return response_err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Erreur lors de l'association de la newsletter aux listes".to_string(),
+                );
+            }
         }
     }
+
+    response_success(StatusCode::CREATED, "Newsletter créée".to_string())
 }

@@ -1,43 +1,67 @@
 use axum::{
-    extract::FromRequestParts,
-    http::{Request, StatusCode},
+    extract::Request,
+    http::{StatusCode, header},
     middleware::Next,
     response::Response,
 };
-use axum_extra::extract::cookie::{Cookie, CookieJar};
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
-use serde::Deserialize;
+use jsonwebtoken::{DecodingKey, Validation, decode};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
-struct Claims {
-    // Exemples de champs à récupérer depuis le token JWT
-    sub: String,
-    exp: usize,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Claims {
+    pub sub: String,
+    pub exp: usize,
 }
 
-pub async fn require_auth<B>(req: Request<B>, next: Next<B>) -> Result<Response, StatusCode> {
-    // Extraction du CookieJar
-    let jar = CookieJar::from_request(&req)
-        .await
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+#[derive(Clone)]
+pub struct Session {
+    pub user_email: String,
+}
 
-    // Récupérer le cookie contenant le token (ici nommé "token")
-    if let Some(token_cookie) = jar.get("token") {
-        let token = token_cookie.value();
-
-        // Définir la clé secrète et la configuration de validation
-        let decoding_key = DecodingKey::from_secret("votre_secret".as_ref());
-        let validation = Validation::new(Algorithm::HS256);
-
-        // Décoder et vérifier le token
-        match decode::<Claims>(token, &decoding_key, &validation) {
-            Ok(_token_data) => {
-                // Token valide, on passe à la suite
-                Ok(next.run(req).await)
-            }
-            Err(_) => Err(StatusCode::UNAUTHORIZED),
-        }
-    } else {
-        Err(StatusCode::UNAUTHORIZED)
+impl Session {
+    pub fn new(user_email: String) -> Self {
+        Self { user_email }
     }
+}
+
+pub async fn auth_middleware(
+    mut req: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, String)> {
+    println!("debug 1");
+    let cookie_header = req
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|hv| hv.to_str().ok());
+    println!("debug 2");
+    let token = cookie_header.and_then(|cookies| {
+        cookies.split(';').find_map(|s| {
+            let s = s.trim();
+            if s.starts_with("auth_token=") {
+                Some(s.trim_start_matches("auth_token=").to_string())
+            } else {
+                None
+            }
+        })
+    });
+
+    println!("debug cookie auth_token = {:?}", token.clone());
+
+    let token = match token {
+        Some(t) => t,
+        None => return Err((StatusCode::UNAUTHORIZED, "Invalid auth token".to_string())),
+    };
+
+    let secret = "secret";
+    let token_data = decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(secret.as_ref()),
+        &Validation::default(),
+    )
+    .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid auth token".to_string()))?;
+
+    req.extensions_mut()
+        .insert(Session::new(token_data.claims.sub));
+
+    Ok(next.run(req).await)
 }

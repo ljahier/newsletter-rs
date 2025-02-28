@@ -1,21 +1,20 @@
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Response, StatusCode, header};
+use axum::http::StatusCode;
 use axum::routing::{get, post};
-use tokio::fs;
+use axum::{Router, middleware};
+use serde_json::json;
 
 use crate::AppState;
-use crate::handlers::newsletters::list_newsletters;
-use crate::handlers::{
-    app::{app_handler, app_login_handler},
-    auth::login,
-};
+use crate::handlers::auth::login;
+use crate::helpers::{auth::auth_middleware, response::response_success};
 
 pub fn create_routes(state: AppState) -> Router {
-    let api_routes = Router::new()
-        .route("/auth/login", post(login))
-        .route("/newsletters", get(list_newsletters))
-        .with_state(state);
+    let public_api_routes = Router::new().route("/login", post(login)).with_state(state);
+    let private_api_routes = Router::new()
+        .route(
+            "/ping",
+            get(|| async { response_success(StatusCode::OK, json!({"message":"pong"})) }),
+        )
+        .layer(middleware::from_fn(auth_middleware));
 
-    Router::new().nest("/api", api_routes)
+    Router::new().nest("/api", public_api_routes.merge(private_api_routes))
 }

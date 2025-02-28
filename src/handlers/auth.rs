@@ -34,11 +34,8 @@ pub struct Claims {
 }
 
 #[derive(FromRow, Debug)]
-struct User {
-    id: String,
-    email: String,
+struct UserPassword {
     password: String,
-    role: String,
 }
 
 /// POST /login
@@ -55,23 +52,22 @@ pub async fn login(
             jar,
         );
     }
-    let user: Option<User> = match sqlx::query_as::<_, User>(
-        "SELECT id, email, password, role FROM users WHERE email = ?",
-    )
-    .bind(&payload.email)
-    .fetch_optional(&state.db_pool)
-    .await
-    {
-        Ok(usr) => usr,
-        Err(err) => {
-            eprintln!("Database query error: {:?}", err);
-            return response_err_with_cookie_jar(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Database error".to_string(),
-                jar,
-            );
-        }
-    };
+    let user: Option<UserPassword> =
+        match sqlx::query_as::<_, UserPassword>("SELECT password FROM users WHERE email = ?")
+            .bind(&payload.email.clone())
+            .fetch_optional(&state.db_pool)
+            .await
+        {
+            Ok(usr) => usr,
+            Err(err) => {
+                eprintln!("Database query error: {:?}", err);
+                return response_err_with_cookie_jar(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error".to_string(),
+                    jar,
+                );
+            }
+        };
 
     let user = match user {
         Some(u) => u,
@@ -97,7 +93,7 @@ pub async fn login(
         .expect("Failed to compute expiration")
         .timestamp() as usize;
     let claims = Claims {
-        sub: user.email,
+        sub: payload.email,
         exp,
     };
 

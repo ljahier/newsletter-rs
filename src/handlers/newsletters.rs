@@ -17,6 +17,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use tracing::{error, info};
 use uuid::Uuid;
 
+#[tracing::instrument(skip(state))]
 pub async fn get_newsletters(State(state): State<AppState>) -> Response {
     let query = r#"
         select s.id,
@@ -79,6 +80,7 @@ pub async fn get_newsletters(State(state): State<AppState>) -> Response {
     response_success(StatusCode::OK, newsletters)
 }
 
+#[tracing::instrument(skip(state))]
 pub async fn create_newsletter(
     State(state): State<AppState>,
     Extension(session): Extension<Session>,
@@ -170,6 +172,7 @@ pub async fn create_newsletter(
     response_success(StatusCode::CREATED, "Newsletter créée".to_string())
 }
 
+#[tracing::instrument(skip(state))]
 pub async fn send_newsletter(
     State(state): State<AppState>,
     Extension(_session): Extension<Session>,

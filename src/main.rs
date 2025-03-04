@@ -4,6 +4,7 @@ mod handlers;
 mod helpers;
 mod models;
 mod routes;
+mod telemetry;
 
 use args::Args;
 use bcrypt::{DEFAULT_COST, hash};
@@ -11,8 +12,7 @@ use clap::Parser;
 use config::config::Config;
 use rand::Rng;
 use sqlx::SqlitePool;
-use std::{error::Error, str::FromStr, sync::OnceLock};
-use tracing::{Level, debug, error, info, trace, warn};
+use std::{error::Error, sync::OnceLock};
 use uuid::Uuid;
 
 static APP_CONFIG: OnceLock<Config> = OnceLock::new();
@@ -64,18 +64,7 @@ async fn main() {
 
     let config = APP_CONFIG.get().expect("Configuration not initialized");
 
-    tracing_subscriber::fmt()
-        .with_max_level(
-            Level::from_str(&config.server.log_level).expect("Error loading log_level value"),
-            // Level::DEBUG,
-        )
-        .init();
-
-    debug!("test");
-    info!("test");
-    error!("test");
-    trace!("test");
-    warn!("test");
+    telemetry::init_telemetry();
 
     let sqlite_db_file_path = &config.database.sqlite.file_path;
 

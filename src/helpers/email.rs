@@ -7,6 +7,7 @@ use lettre::{
 
 use crate::APP_CONFIG;
 
+#[tracing::instrument]
 pub fn make_smtp_mailbox() -> Mailbox {
     let config = &APP_CONFIG
         .get()
@@ -19,6 +20,7 @@ pub fn make_smtp_mailbox() -> Mailbox {
     )
 }
 
+#[tracing::instrument]
 pub fn send_email(
     mailer: &SmtpTransport,
     from: &Mailbox,

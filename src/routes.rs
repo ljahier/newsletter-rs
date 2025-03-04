@@ -8,6 +8,7 @@ use crate::handlers::auth::login;
 use crate::handlers::contact_lists::{create_contact_list, list_contact_lists};
 use crate::handlers::newsletters::{create_newsletter, get_newsletters, send_newsletter};
 use crate::helpers::{auth::auth_middleware, response::response_success};
+use crate::telemetry::request_id_middleware;
 
 pub fn create_routes(state: &AppState) -> Router {
     let public_api_routes = Router::new()
@@ -32,7 +33,8 @@ pub fn create_routes(state: &AppState) -> Router {
                 .route("/", get(list_contact_lists)),
         )
         .with_state(state.clone())
-        .layer(middleware::from_fn(auth_middleware));
+        .layer(middleware::from_fn(auth_middleware))
+        .layer(middleware::from_fn(request_id_middleware));
 
     Router::new().nest("/api", public_api_routes.merge(private_api_routes))
 }

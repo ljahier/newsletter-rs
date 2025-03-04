@@ -10,7 +10,7 @@ bcrypt = "0.17.0"
 chrono = { version = "0.4.39", features = ["serde"] }
 clap = { version = "4.5.31", features = ["derive"] }
 jsonwebtoken = "9.3.1"
-lettre = "0.11.14"
+lettre = { version = "0.11.14", features = ["tracing"] }
 opentelemetry = { version = "0.28.0", features = ["trace"] }
 opentelemetry-stdout = { version = "0.28.0", features = ["trace"] }
 opentelemetry_sdk = { version = "0.28.0", features = ["trace", "rt-tokio"] }
@@ -31,3 +31,4 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 tracing-opentelemetry = "0.29.0"
 uuid = { version = "1.14.0", features = ["v4", "serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
+opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic"] }

@@ -16,6 +16,11 @@ pub struct Contact {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, Deserialize, sqlx::FromRow, Debug)]
+pub struct ContactEmail {
+    pub email: String,
+}
+
 #[derive(Serialize, Debug)]
 pub struct ContactListWithMembers {
     pub id: String,

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::helpers::email::{make_smtp_mailbox, send_email};
 use crate::helpers::response::{response_err, response_success};
-use crate::models::contact::Contact;
+use crate::models::contact::ContactEmail;
 use crate::models::newsletters::{
     NewsletterForSend, NewsletterRaw, NewsletterRequest, NewsletterWithLists,
 };
@@ -203,7 +203,7 @@ pub async fn send_newsletter(
             );
         }
     };
-    let contacts: Vec<Contact> = match sqlx::query_as(
+    let contacts: Vec<ContactEmail> = match sqlx::query_as(
         r#"
         SELECT c.email
         FROM contacts c

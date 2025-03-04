@@ -55,7 +55,9 @@ create table if not exists sendings (
   ),
   name text not null,
   send_date timestamp with time zone,
-  status text check (status in ('pending', 'sent', 'failed', 'draft')),
+  status text check (
+    status in ('scheduled', 'sent', 'failed', 'draft')
+  ),
   content_html text,
   content_plain text,
   theme_id text,

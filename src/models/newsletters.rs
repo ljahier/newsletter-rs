@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 
 #[derive(Serialize, sqlx::FromRow, Debug)]
 pub struct NewsletterRaw {
@@ -39,4 +40,12 @@ pub struct NewsletterRequest {
     pub content: String,
     pub action: String,
     pub contact_list_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct NewsletterForSend {
+    pub id: String,
+    pub name: String,
+    pub content_html: Option<String>,
+    pub content_plain: Option<String>,
 }

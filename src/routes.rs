@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::AppState;
 use crate::handlers::auth::login;
 use crate::handlers::contact_lists::{create_contact_list, list_contact_lists};
-use crate::handlers::newsletters::{create_newsletter, get_newsletters};
+use crate::handlers::newsletters::{create_newsletter, get_newsletters, send_newsletter};
 use crate::helpers::{auth::auth_middleware, response::response_success};
 
 pub fn create_routes(state: &AppState) -> Router {
@@ -22,7 +22,8 @@ pub fn create_routes(state: &AppState) -> Router {
             "/newsletters",
             Router::new()
                 .route("/", get(get_newsletters))
-                .route("/", post(create_newsletter)),
+                .route("/", post(create_newsletter))
+                .route("/{id}/send", post(send_newsletter)), // test route
         )
         .nest(
             "/contact_lists",

@@ -1,12 +1,20 @@
 use std::collections::HashSet;
 
-use crate::AppState;
+use crate::helpers::email::{make_smtp_mailbox, send_email};
 use crate::helpers::response::{response_err, response_success};
-use crate::models::newsletters::{NewsletterRaw, NewsletterRequest, NewsletterWithLists};
+use crate::models::contact::Contact;
+use crate::models::newsletters::{
+    NewsletterForSend, NewsletterRaw, NewsletterRequest, NewsletterWithLists,
+};
 use crate::models::types::Session;
+use crate::{APP_CONFIG, AppState};
+use axum::extract::Path;
 use axum::{Extension, Json};
 use axum::{extract::State, http::StatusCode, response::Response};
 use chrono::{NaiveDateTime, TimeZone, Utc};
+use lettre::SmtpTransport;
+use lettre::transport::smtp::authentication::Credentials;
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub async fn get_newsletters(State(state): State<AppState>) -> Response {
@@ -76,12 +84,12 @@ pub async fn create_newsletter(
     Extension(session): Extension<Session>,
     Json(payload): Json<NewsletterRequest>,
 ) -> Response {
-    let (status, send_date, sent_at) = if payload.action == "send" {
+    let (status, send_date, sent_at) = if payload.action == "scheduled" {
         if let Some(ref send_date_str) = payload.send_date {
             match NaiveDateTime::parse_from_str(send_date_str, "%Y-%m-%dT%H:%M") {
                 Ok(naive_dt) => {
                     let dt = Utc.from_utc_datetime(&naive_dt);
-                    ("pending", Some(dt), None)
+                    ("scheduled", Some(dt), None)
                 }
                 Err(e) => {
                     eprintln!("Erreur de parsing de send_date: {:?}", e);
@@ -114,8 +122,8 @@ pub async fn create_newsletter(
     let id = Uuid::new_v4().to_string();
 
     let result = sqlx::query(
-        "insert into sendings (id, type, name, send_date, sent_by, status, content_html, content_plain, sent_at, sent_by)
-         values (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?, ?)"
+        "insert into sendings (id, type, name, send_date, sent_by, status, content_html, content_plain, sent_at, theme_id)
+         values (?, 'newsletter', ?, ?, ?, ?, ?, ?, ?, NULL);"
     )
     .bind(&id)
     .bind(&payload.name)
@@ -125,7 +133,6 @@ pub async fn create_newsletter(
     .bind(content_html)
     .bind(content_plain)
     .bind(sent_at)
-    .bind(None::<String>)
     .execute(&state.db_pool)
     .await;
 
@@ -161,4 +168,102 @@ pub async fn create_newsletter(
     }
 
     response_success(StatusCode::CREATED, "Newsletter créée".to_string())
+}
+
+pub async fn send_newsletter(
+    State(state): State<AppState>,
+    Extension(_session): Extension<Session>,
+    Path(newsletter_id): Path<String>,
+) -> Response {
+    let config = &APP_CONFIG.get().expect("Configuration not initialized");
+    let newsletter: NewsletterForSend = match sqlx::query_as(
+        r#"
+        SELECT id, name, content_html, content_plain
+        FROM sendings
+        WHERE id = ? AND type = 'newsletter' AND status = 'scheduled'
+        "#,
+    )
+    .bind(newsletter_id.as_str())
+    .fetch_one(&state.db_pool)
+    .await
+    {
+        Ok(n) => n,
+        Err(e) => {
+            error!(
+                "Erreur de récupération de la newsletter {}: {:?}",
+                newsletter_id.as_str(),
+                e,
+            );
+            return response_err(
+                axum::http::StatusCode::NOT_FOUND,
+                "Newsletter non trouvée".into(),
+            );
+        }
+    };
+    let contacts: Vec<Contact> = match sqlx::query_as(
+        r#"
+        SELECT c.email
+        FROM contacts c
+        JOIN contact_list_members clm ON c.id = clm.contact_id
+        JOIN sending_contact_lists scl ON clm.list_id = scl.contact_list_id
+        WHERE scl.sending_id = ?
+        "#,
+    )
+    .bind(newsletter_id.as_str())
+    .fetch_all(&state.db_pool)
+    .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            error!(
+                "Erreur lors de la récupération des contacts pour la newsletter {}: {:?}",
+                newsletter_id.as_str(),
+                e
+            );
+            return response_err(
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Erreur de base de données".into(),
+            );
+        }
+    };
+
+    let mailbox = make_smtp_mailbox();
+
+    let creds = Credentials::new(
+        config.email.smtp.auth_user.clone(),
+        config.email.smtp.auth_password.clone(),
+    );
+    let mailer = SmtpTransport::relay(&config.email.smtp.server_host)
+        .expect("Erreur de configuration du relay SMTP")
+        .credentials(creds)
+        .port(config.email.smtp.server_port)
+        .build();
+
+    let email_body = newsletter
+        .content_html
+        .unwrap_or_else(|| newsletter.content_plain.unwrap_or_default());
+
+    let (sent, failed) = contacts.iter().fold((0, 0), |(sent, failed), contact| {
+        match send_email(
+            &mailer,
+            &mailbox,
+            &contact.email,
+            &newsletter.name,
+            &email_body,
+        ) {
+            Ok(_) => {
+                info!("Email envoyé à {}", contact.email);
+                (sent + 1, failed)
+            }
+            Err(e) => {
+                error!("Erreur d'envoi à {}: {:?}", contact.email, e);
+                (sent, failed + 1)
+            }
+        }
+    });
+
+    response_success(
+        axum::http::StatusCode::OK,
+        format!("Newsletter envoyée: {} réussites, {} échecs", sent, failed),
+    )
 }

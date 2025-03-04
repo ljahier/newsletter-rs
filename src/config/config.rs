@@ -32,7 +32,7 @@ pub struct EmailConfig {
     pub identity: IdentityConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SmtpConfig {
     pub server_host: String,
     pub server_port: u16,
@@ -72,12 +72,12 @@ impl Config {
         if self.email.smtp.server_host.trim().is_empty() {
             return Err("email.smtp.server_host is empty".into());
         }
-        if self.email.smtp.auth_user.trim().is_empty() {
-            return Err("email.smtp.auth_user is empty".into());
-        }
-        if self.email.smtp.auth_password.trim().is_empty() {
-            return Err("email.smtp.auth_password is empty".into());
-        }
+        // if self.email.smtp.auth_user.trim().is_empty() {
+        //     return Err("email.smtp.auth_user is empty".into());
+        // }
+        // if self.email.smtp.auth_password.trim().is_empty() {
+        //     return Err("email.smtp.auth_password is empty".into());
+        // }
         if self.email.identity.from_name.trim().is_empty() {
             return Err("email.identity.from_name is empty".into());
         }

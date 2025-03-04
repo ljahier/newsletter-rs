@@ -5,7 +5,9 @@ use serde_json::json;
 
 use crate::AppState;
 use crate::handlers::auth::login;
-use crate::handlers::contact_lists::{create_contact_list, list_contact_lists};
+use crate::handlers::contact_lists::{
+    create_contact, create_contact_list, get_contact_list_by_id, list_contact_lists,
+};
 use crate::handlers::newsletters::{create_newsletter, get_newsletters, send_newsletter};
 use crate::helpers::{auth::auth_middleware, response::response_success};
 use crate::telemetry::request_id_middleware;
@@ -30,7 +32,9 @@ pub fn create_routes(state: &AppState) -> Router {
             "/contact_lists",
             Router::new()
                 .route("/", post(create_contact_list))
-                .route("/", get(list_contact_lists)),
+                .route("/", get(list_contact_lists))
+                .route("/{id}", get(get_contact_list_by_id))
+                .route("/{id}/contacts", post(create_contact)),
         )
         .with_state(state.clone())
         .layer(middleware::from_fn(auth_middleware))

@@ -36,3 +36,8 @@ pub struct NewContactRequest {
     pub email: String,
     pub custom_fields: Option<String>,
 }
+
+#[derive(Serialize, sqlx::FromRow, Debug)]
+pub struct ContactEmail {
+    pub email: String,
+}

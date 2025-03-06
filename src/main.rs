@@ -10,6 +10,7 @@ use args::Args;
 use bcrypt::{DEFAULT_COST, hash};
 use clap::Parser;
 use config::config::Config;
+use helpers::email::Email;
 use rand::Rng;
 use sqlx::SqlitePool;
 use std::{error::Error, sync::OnceLock};
@@ -65,6 +66,8 @@ async fn main() {
     let config = APP_CONFIG.get().expect("Configuration not initialized");
 
     telemetry::init_telemetry();
+
+    Email::init(&config.email);
 
     let sqlite_db_file_path = &config.database.sqlite.file_path;
 

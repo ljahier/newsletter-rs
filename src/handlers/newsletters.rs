@@ -1,19 +1,16 @@
-use std::collections::HashSet;
-
-use crate::helpers::email::{make_smtp_mailbox, send_email};
+use crate::AppState;
+use crate::helpers::email::Email;
 use crate::helpers::response::{response_err, response_success};
-use crate::models::contact::Contact;
+use crate::models::contact::ContactEmail;
 use crate::models::newsletters::{
     NewsletterForSend, NewsletterRaw, NewsletterRequest, NewsletterWithLists,
 };
 use crate::models::types::Session;
-use crate::{APP_CONFIG, AppState};
 use axum::extract::Path;
 use axum::{Extension, Json};
 use axum::{extract::State, http::StatusCode, response::Response};
 use chrono::{NaiveDateTime, TimeZone, Utc};
-use lettre::SmtpTransport;
-use lettre::transport::smtp::authentication::Credentials;
+use std::collections::HashSet;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -172,13 +169,12 @@ pub async fn create_newsletter(
     response_success(StatusCode::CREATED, "Newsletter créée".to_string())
 }
 
-#[tracing::instrument(skip(state))]
+#[tracing::instrument(skip(state), level = "debug")]
 pub async fn send_newsletter(
     State(state): State<AppState>,
     Extension(_session): Extension<Session>,
     Path(newsletter_id): Path<String>,
 ) -> Response {
-    let config = &APP_CONFIG.get().expect("Configuration not initialized");
     let newsletter: NewsletterForSend = match sqlx::query_as(
         r#"
         SELECT id, name, content_html, content_plain
@@ -203,7 +199,7 @@ pub async fn send_newsletter(
             );
         }
     };
-    let contacts: Vec<Contact> = match sqlx::query_as(
+    let contacts: Vec<ContactEmail> = match sqlx::query_as(
         r#"
         SELECT c.email
         FROM contacts c
@@ -230,40 +226,23 @@ pub async fn send_newsletter(
         }
     };
 
-    let mailbox = make_smtp_mailbox();
-
-    let creds = Credentials::new(
-        config.email.smtp.auth_user.clone(),
-        config.email.smtp.auth_password.clone(),
-    );
-    let mailer = SmtpTransport::relay(&config.email.smtp.server_host)
-        .expect("Erreur de configuration du relay SMTP")
-        .credentials(creds)
-        .port(config.email.smtp.server_port)
-        .build();
-
+    let email_helper = Email::get();
     let email_body = newsletter
         .content_html
         .unwrap_or_else(|| newsletter.content_plain.unwrap_or_default());
-
-    let (sent, failed) = contacts.iter().fold((0, 0), |(sent, failed), contact| {
-        match send_email(
-            &mailer,
-            &mailbox,
-            &contact.email,
-            &newsletter.name,
-            &email_body,
-        ) {
-            Ok(_) => {
-                info!("Email envoyé à {}", contact.email);
-                (sent + 1, failed)
+    let (sent, failed) =
+        contacts.iter().fold((0, 0), |(sent, failed), contact| {
+            match email_helper.send_email(&contact.email, &newsletter.name, &email_body) {
+                Ok(_) => {
+                    info!("Email envoyé à {}", contact.email);
+                    (sent + 1, failed)
+                }
+                Err(e) => {
+                    error!("Erreur d'envoi à {}: {:?}", contact.email, e);
+                    (sent, failed + 1)
+                }
             }
-            Err(e) => {
-                error!("Erreur d'envoi à {}: {:?}", contact.email, e);
-                (sent, failed + 1)
-            }
-        }
-    });
+        });
 
     response_success(
         axum::http::StatusCode::OK,
